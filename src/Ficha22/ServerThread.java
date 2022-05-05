@@ -1,7 +1,5 @@
 package Ficha22;
 
-import Ficha16.Buffer;
-
 import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -51,26 +49,26 @@ public class ServerThread  extends Thread{
                 switch (option){
 
                     case "1":
-                        System.out.println("Thread " +this.getName() + ": A enviar a lista de items");
+                        System.out.println("Thread " + this.getName() + ": A enviar a lista de items");
                         sendItemsList(out);
                         break;
 
                     case "2":
 
                         if (this.isInterrupted()){
-                            System.out.println("Thread " +this.getName() + ": A enviar os resultados do sorteio");
+                            System.out.println("Thread " + this.getName() + ": A enviar os resultados do sorteio");
                             out.println(1); // Se o cliente receber 1, quer dizer vai receber os resultados logo a seguir
                             sendResults(out);
 
                         } else {
-                            System.out.println("Thread " +this.getName() + ": Resultados não enviados, pois o sorteio ainda não acabou");
+                            System.out.println("Thread " + this.getName() + ": Resultados não enviados, pois o sorteio ainda não acabou");
                             out.println(0); // Se o cliente receber 0, quer dizer que ainda não acabou, logo não vai receber os resultados
                         }
 
                         break;
 
                     case "3":
-                        System.out.println("Thread " +this.getName() + ": O cliente saiu");
+                        System.out.println("Thread " + this.getName() + ": O cliente saiu");
                         break;
                 }
 
@@ -112,10 +110,12 @@ public class ServerThread  extends Thread{
 
         } catch (FileNotFoundException e) {
             System.out.println("Thread " + this.getName() + ": Ficheiros de sorteio não encontrado");
+            this.raffleLock.unlock();
             System.exit(2);
 
         } catch (IOException e){
             System.out.println("Thread " + this.getName() + ": Erro de leitura do ficheiro do sorteio");
+            this.raffleLock.unlock();
             System.exit(3);
 
         }
@@ -149,6 +149,7 @@ public class ServerThread  extends Thread{
 
         } catch (IOException e) {
             System.out.println("Thread " + this.getName() + ": Erro de escrita,  abertura ou fecho do ficheiro de sorteio");
+            this.raffleLock.unlock();
             System.exit(4);
         }
 
@@ -178,13 +179,89 @@ public class ServerThread  extends Thread{
 
         } catch (FileNotFoundException e) {
             System.out.println("Thread " + this.getName() + ": Erro de leitura do ficheiro de itens");
+            this.itemsLock.unlock();
             System.exit(5);
 
         } catch (IOException e) {
-            System.out.println("Thread " +this.getName() + ": Erro de leitura do ficheiro de itens");
+            System.out.println("Thread " + this.getName() + ": Erro de leitura do ficheiro de itens");
+            this.itemsLock.unlock();
             System.exit(6);
         }
 
         this.itemsLock.unlock(); //Desbloqueia acesso
+
+    }
+
+    private void sendResults(PrintWriter out){
+
+        String itemNameRaffle = null;
+
+        this.itemsLock.lock(); //Acesso Bloqueado
+
+        try {
+            this.fileItemsBReader = new BufferedReader(new FileReader(this.itemsFilePath));
+
+            itemNameRaffle = "";
+
+            for (int i = 0 ; i <= this.itemNumberRaffle ; i++) {
+                itemNameRaffle = this.fileItemsBReader.readLine();
+            }
+
+            this.fileItemsBReader.close();
+
+
+        } catch (FileNotFoundException e) {
+            System.out.println("Thread " + this.getName() + ": Ficheiro de itens não encontrado");
+            System.exit(7);
+
+        } catch (IOException e) {
+            System.out.println("Thread " + this.getName() + ": Erro de leitura ou de fecho do ficheiro de itens");
+            System.exit(8);
+        }
+        this.itemsLock.unlock(); //Acesso Desbloqueado
+
+        out.println("\t\t\t### Resultados do sorteio ###");
+        out.println("");
+        out.println("\t Foi-lhe sorteado o item: " + itemNameRaffle);
+        out.println("");
+
+        this.itemsLock.lock();
+        this.raffleLock.lock();
+
+        try {
+            this.fileItemsBReader = new BufferedReader(new FileReader(this.itemsFilePath));
+            this.filesRaffleBReader = new BufferedReader(new FileReader(this.raffleFilePath));
+
+            String itemName = "";
+            String threadName = "";
+
+            while (itemName != null) {
+                itemName = this.fileItemsBReader.readLine();
+                threadName = this.filesRaffleBReader.readLine();
+
+                if (itemName != null) {
+                    out.println(itemName + " - " + threadName);
+                }
+            }
+            out.println("####");
+
+            this.fileItemsBReader.close();
+            this.filesRaffleBReader.close();
+
+
+        } catch (FileNotFoundException e) {
+            System.out.println("Thread " + this.getName() + ": Ficheiro de itens ou de sorteio não encontrado");
+            this.itemsLock.unlock();
+            this.raffleLock.unlock();
+            System.exit(9);
+
+        } catch (IOException e) {
+            System.out.println("Thread " + this.getName() + ": Erro de leitura ou fecho do ficheiro de itens ou do ficheiro de sorteio");
+            this.itemsLock.unlock();
+            this.raffleLock.unlock();
+            System.exit(10);
+        }
+        this.itemsLock.unlock();
+        this.raffleLock.unlock();
     }
 }
